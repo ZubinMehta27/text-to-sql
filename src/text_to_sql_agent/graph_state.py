@@ -1,17 +1,39 @@
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import List, Optional
 
 
 @dataclass
 class GraphState:
     """
     Shared state object passed through LangGraph.
-    Defaults are REQUIRED to avoid runtime crashes during reloads.
+    Defaults are REQUIRED to avoid runtime crashes.
     """
 
+    # ------------------------------------------------------------
+    # Required at entry
+    # ------------------------------------------------------------
     user_query: str
-    schema_context: str = ""  
+    schema_context: str
 
+    # ------------------------------------------------------------
+    # SQL generation / validation
+    # ------------------------------------------------------------
     sql_query: Optional[str] = None
-    result: Optional[Any] = None
-    final_answer: Optional[Any] = None
+    sql_valid: bool = False
+    validation_error: Optional[str] = None
+
+    # ------------------------------------------------------------
+    # Execution
+    # ------------------------------------------------------------
+    execution_result: Optional[List[dict]] = None
+
+    # ------------------------------------------------------------
+    # Retry policy
+    # ------------------------------------------------------------
+    retry_count: int = 0
+    max_retries: int = 3
+
+    # ------------------------------------------------------------
+    # Final output
+    # ------------------------------------------------------------
+    final_answer: Optional[dict] = None

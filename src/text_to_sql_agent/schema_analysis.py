@@ -1,6 +1,3 @@
-# =========================
-# schema_analysis.py
-# =========================
 from sqlalchemy import text
 from collections import defaultdict
 

@@ -9,7 +9,6 @@ from text_to_sql_agent.result_processing.visualization_hints import visualizatio
 from text_to_sql_agent.sql_tools import (
     sql_check_tool,
     sql_exec_tool,
-    HardTermination,
 )
 
 # ============================================================
@@ -19,17 +18,36 @@ from text_to_sql_agent.sql_tools import (
 def generate_sql_node(agent):
     """
     Invoke the LLM to generate SQL from schema context + user query.
+    Retry-aware and bounded.
     """
     def _node(state):
-        response = agent.invoke(
-            [
-                SystemMessage(content=state.schema_context),
-                HumanMessage(content=state.user_query),
-            ]
+        messages = [
+            SystemMessage(content=state.schema_context),
+        ]
+
+        if state.validation_error:
+            messages.append(
+                SystemMessage(
+                    content=(
+                        "The previous SQL query was invalid.\n"
+                        f"Error: {state.validation_error}\n\n"
+                        "Generate a corrected SQL query that fixes this issue."
+                    )
+                )
+            )
+
+        messages.append(
+            HumanMessage(content=state.user_query)
         )
 
+        response = agent.invoke(messages)
+
         sql = response.content.strip() if response and response.content else ""
-        return {"sql_query": sql}
+
+        return {
+            "sql_query": sql,
+            "retry_count": state.retry_count + 1,
+        }
 
     return RunnableLambda(_node)
 
@@ -41,14 +59,20 @@ def generate_sql_node(agent):
 def validate_sql(state):
     """
     Deterministically validate generated SQL.
-    Raises HardTermination on failure.
+    Writes validation outcome into state.
     """
     check = sql_check_tool(state.sql_query)
 
     if check == "VALID":
-        return {}
+        return {
+            "sql_valid": True,
+            "validation_error": None,
+        }
 
-    raise HardTermination(check)
+    return {
+        "sql_valid": False,
+        "validation_error": check,
+    }
 
 
 # ============================================================
@@ -93,7 +117,6 @@ def execute_sql(state):
     }
 
     if output_type == "scalar":
-        # Single value (e.g. COUNT, SUM)
         response["data"] = (
             list(normalized[0].values())[0] if normalized else None
         )
@@ -103,11 +126,10 @@ def execute_sql(state):
         response["csv"] = export_csv(normalized)
 
     elif output_type == "time_series":
-        # Keep rows as-is; frontend decides charting
         response["data"] = normalized
 
     return {
-        "final_answer": response
+        "final_answer": response,
     }
 
 
@@ -118,8 +140,23 @@ def execute_sql(state):
 def final_response_node(state):
     """
     Return final API response.
-    This node should remain a thin pass-through.
+    Handles both success and retry exhaustion.
     """
+
+    # Case 1: Successful execution
+    if state.sql_valid and state.final_answer is not None:
+        return {
+            "final_answer": state.final_answer
+        }
+
+    # Case 2: Retry exhaustion / invalid SQL
     return {
-        "final_answer": state.final_answer
+        "final_answer": {
+            "type": "error",
+            "message": (
+                "I couldn't generate a valid SQL query "
+                f"after {state.max_retries} attempts."
+            ),
+            "last_error": state.validation_error,
+        }
     }
