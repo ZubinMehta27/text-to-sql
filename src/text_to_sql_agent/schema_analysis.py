@@ -8,9 +8,6 @@ def analyze_schema(engine):
     """
     Introspect the database schema.
 
-    Args:
-        engine: SQLAlchemy engine.
-
     Returns:
         tables: Mapping of table -> columns and primary keys.
         foreign_keys: Mapping of table -> foreign key relationships.
