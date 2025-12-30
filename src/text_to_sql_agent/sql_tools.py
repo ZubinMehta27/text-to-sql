@@ -17,6 +17,7 @@ class HardTermination(Exception):
     """
     pass
 
+# Tools for Text-to-SQL
 
 def extract_tables(sql: str) -> set[str]:
     """
@@ -44,7 +45,7 @@ def sql_check_tool(query: str) -> str:
     if "--" in normalized or "/*" in normalized or "*/" in normalized:
         return "INVALID: SQL comments are not allowed."
 
-    # Parse + extract tables
+    # Parsing 
     try:
         extract_tables(query)
     except Exception:
