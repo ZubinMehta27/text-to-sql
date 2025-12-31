@@ -13,3 +13,6 @@ wheels/
 .pytest_cache
 tests/
 .vscode
+
+# Others
+presentation/
