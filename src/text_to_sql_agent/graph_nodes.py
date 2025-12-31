@@ -6,7 +6,9 @@ from text_to_sql_agent.result_processing.table_formatter import format_table
 from text_to_sql_agent.result_processing.csv_exporter import export_csv
 from text_to_sql_agent.result_processing.visualization_hints import visualization_hint
 
-from text_to_sql_agent.sql_tools import (
+from langchain_core.messages import ToolMessage
+
+from text_to_sql_agent.sql_tools.sql_tools import (
     sql_check_tool,
     sql_exec_tool,
     HardTermination,
@@ -19,17 +21,36 @@ from text_to_sql_agent.sql_tools import (
 def generate_sql_node(agent):
     """
     Invoke the LLM to generate SQL from schema context + user query.
+    Retry-aware and bounded.
     """
     def _node(state):
-        response = agent.invoke(
-            [
-                SystemMessage(content=state.schema_context),
-                HumanMessage(content=state.user_query),
-            ]
+        messages = [
+            SystemMessage(content=state.schema_context),
+        ]
+
+        if state.validation_error:
+            messages.append(
+                SystemMessage(
+                    content=(
+                        "The previous SQL query was invalid.\n"
+                        f"Error: {state.validation_error}\n\n"
+                        "Generate a corrected SQL query that fixes this issue."
+                    )
+                )
+            )
+
+        messages.append(
+            HumanMessage(content=state.user_query)
         )
 
+        response = agent.invoke(messages)
+
         sql = response.content.strip() if response and response.content else ""
-        return {"sql_query": sql}
+
+        return {
+            "sql_query": sql,
+            "retry_count": state.retry_count + 1,
+        }
 
     return RunnableLambda(_node)
 

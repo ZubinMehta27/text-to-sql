@@ -1,12 +1,12 @@
 import logging
 from sqlalchemy import text
-from sqlglot import parse_one, exp
 import sqlalchemy
 
 from text_to_sql_agent.db import engine
 
 from text_to_sql_agent.runtime_bootstrap import FOREIGN_KEYS
-from text_to_sql_agent.sql_validation.join_validator import validate_joins
+
+from text_to_sql_agent.sql_tools.sql_static_checks import sql_static_check
 
 logger = logging.getLogger(__name__)
 sql_logger = logging.getLogger("text_to_sql_agent.sql")
@@ -17,48 +17,12 @@ class HardTermination(Exception):
     """
     pass
 
-# Tools for Text-to-SQL
-
-def extract_tables(sql: str) -> set[str]:
-    """
-    Extract table names from a SQL query.
-
-    Args:
-        sql: SQL string.
-
-    Returns:
-        Set of table names.
-    """
-    tree = parse_one(sql, read="sqlite")
-    return {t.name.lower() for t in tree.find_all(exp.Table) if t.name}
-
 
 def sql_check_tool(query: str) -> str:
-    if not query:
-        return "INVALID: Empty query."
+    static_check = sql_static_check(query)
+    if static_check != "VALID":
+        return static_check
 
-    normalized = query.strip().lower()
-
-    if not normalized.startswith(("select", "with")):
-        return "INVALID: Only SELECT or WITH queries are allowed."
-
-    if "--" in normalized or "/*" in normalized or "*/" in normalized:
-        return "INVALID: SQL comments are not allowed."
-
-    # Parsing 
-    try:
-        extract_tables(query)
-    except Exception:
-        return "INVALID: Failed to parse SQL."
-
-    # Join validation (only if joins exist)
-    try:
-        if " join " in normalized and not validate_joins(query, FOREIGN_KEYS):
-            return "INVALID: Join condition does not match schema foreign keys."
-    except Exception:
-        return "INVALID: Failed to validate join conditions."
-
-    # Final DB-level sanity check
     with engine.connect() as conn:
         try:
             conn.execute(text(f"EXPLAIN QUERY PLAN {query}"))
