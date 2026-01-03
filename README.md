@@ -1,4 +1,4 @@
-# Text-to-SQL: Deterministic vs Tool-Based Architectures
+# Text-to-SQL: Deterministic vs Tool-Based Architectures (WIP)
 
 This repository investigates a core systems question:
 
@@ -42,4 +42,5 @@ They augment them — when strictly constrained.
 
 ## Paper
 
-A full technical paper is included in `/paper/`.
+A full technical paper can be accessed [here](https://github.com/ZubinMehta27/text-to-sql/blob/main/T2S%20Research%20Paper.pdf).
+
