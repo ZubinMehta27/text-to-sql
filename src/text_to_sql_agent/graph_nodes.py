@@ -6,16 +6,20 @@ from text_to_sql_agent.result_processing.table_formatter import format_table
 from text_to_sql_agent.result_processing.csv_exporter import export_csv
 from text_to_sql_agent.result_processing.visualization_hints import visualization_hint
 
-from langchain_core.messages import ToolMessage
+from text_to_sql_agent.sql_tools.normalization import normalize_sql
+from text_to_sql_agent.utils.load_markdown import load_markdown_content
 
 from text_to_sql_agent.sql_tools.sql_tools import (
     sql_check_tool,
     sql_exec_tool,
 )
 
+SYSTEM_PROMPT = load_markdown_content("prompts.md")
+
 # ============================================================
 # Generate SQL Node
 # ============================================================
+
 
 def generate_sql_node(agent):
     """
@@ -24,7 +28,10 @@ def generate_sql_node(agent):
     """
     def _node(state):
         messages = [
-            SystemMessage(content=state.schema_context),
+            # 🔒 CRITICAL: strict SQL contract
+            SystemMessage(
+                content=f"{SYSTEM_PROMPT}\n\n{state.schema_context}"
+            )
         ]
 
         if state.validation_error:
@@ -33,7 +40,7 @@ def generate_sql_node(agent):
                     content=(
                         "The previous SQL query was invalid.\n"
                         f"Error: {state.validation_error}\n\n"
-                        "Generate a corrected SQL query that fixes this issue."
+                        "Output ONLY a corrected SQL query starting with SELECT or WITH."
                     )
                 )
             )
@@ -44,7 +51,7 @@ def generate_sql_node(agent):
 
         response = agent.invoke(messages)
 
-        sql = response.content.strip() if response and response.content else ""
+        sql = normalize_sql(response)
 
         return {
             "sql_query": sql,
@@ -52,7 +59,6 @@ def generate_sql_node(agent):
         }
 
     return RunnableLambda(_node)
-
 
 # ============================================================
 # Validate SQL Node
