@@ -1,12 +1,12 @@
-# =========================
-# schema_analysis.py
-# =========================
 from sqlalchemy import text
 from collections import defaultdict
 
 def analyze_schema(engine):
     """
     Introspect the database schema.
+
+    Args:
+        engine: SQLAlchemy engine.
 
     Returns:
         tables: Mapping of table -> columns and primary keys.

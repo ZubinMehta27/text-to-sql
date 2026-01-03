@@ -11,7 +11,6 @@ from langchain_core.messages import ToolMessage
 from text_to_sql_agent.sql_tools.sql_tools import (
     sql_check_tool,
     sql_exec_tool,
-    HardTermination,
 )
 
 # ============================================================
@@ -62,14 +61,20 @@ def generate_sql_node(agent):
 def validate_sql(state):
     """
     Deterministically validate generated SQL.
-    Raises HardTermination on failure.
+    Writes validation outcome into state.
     """
     check = sql_check_tool(state.sql_query)
 
     if check == "VALID":
-        return {}
+        return {
+            "sql_valid": True,
+            "validation_error": None,
+        }
 
-    raise HardTermination(check)
+    return {
+        "sql_valid": False,
+        "validation_error": check,
+    }
 
 
 # ============================================================
@@ -114,7 +119,6 @@ def execute_sql(state):
     }
 
     if output_type == "scalar":
-        # Single value (e.g. COUNT, SUM)
         response["data"] = (
             list(normalized[0].values())[0] if normalized else None
         )
@@ -124,11 +128,10 @@ def execute_sql(state):
         response["csv"] = export_csv(normalized)
 
     elif output_type == "time_series":
-        # Keep rows as-is; frontend decides charting
         response["data"] = normalized
 
     return {
-        "final_answer": response
+        "final_answer": response,
     }
 
 
@@ -139,8 +142,23 @@ def execute_sql(state):
 def final_response_node(state):
     """
     Return final API response.
-    This node should remain a thin pass-through.
+    Handles both success and retry exhaustion.
     """
+
+    # Case 1: Successful execution
+    if state.sql_valid and state.final_answer is not None:
+        return {
+            "final_answer": state.final_answer
+        }
+
+    # Case 2: Retry exhaustion / invalid SQL
     return {
-        "final_answer": state.final_answer
+        "final_answer": {
+            "type": "error",
+            "message": (
+                "I couldn't generate a valid SQL query "
+                f"after {state.max_retries} attempts."
+            ),
+            "last_error": state.validation_error,
+        }
     }
