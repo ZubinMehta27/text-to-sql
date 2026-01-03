@@ -97,7 +97,7 @@ def explain_why_query_failed(
     pass
 
 @tools
-def rewrite_query_for_user_friendly_errors(
+def rewrite_query_for_user(
     schema: str,
     question: str,
     invalid_sql: str,
