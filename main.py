@@ -2,7 +2,10 @@ from fastapi import FastAPI
 import logging
 import sys
 
-from text_to_sql_agent.schema_analysis import build_schema_context
+from text_to_sql_agent.schema_analysis import (
+    build_schema_context,
+    extract_schema_entities,
+)
 from text_to_sql_agent.runtime_bootstrap import TABLES, FOREIGN_KEYS
 from text_to_sql_agent.config import settings
 from text_to_sql_agent.models.models import ChatRequest
@@ -23,14 +26,21 @@ graph = build_graph(agent)
 
 @app.post("/chat")
 def chat(request: ChatRequest):
-    # Build schema context
+    # ------------------------------------------------------------
+    # Schema analysis (single source of truth)
+    # ------------------------------------------------------------
     schema_context = build_schema_context(TABLES, FOREIGN_KEYS)
 
-    # ✅ Proper state initialization (Step 6 complete)
+    # 🔹 STEP 2: derive schema entities deterministically
+    schema_entities = extract_schema_entities(TABLES)
+
+    # ------------------------------------------------------------
+    # Proper state initialization
+    # ------------------------------------------------------------
     state = build_initial_state(
         user_query=request.query,
         schema_context=schema_context,
-        max_retries=settings.max_retries,
+        schema_entities=schema_entities,
     )
 
     final_state = graph.invoke(state)

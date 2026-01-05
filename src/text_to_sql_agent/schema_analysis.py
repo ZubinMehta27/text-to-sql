@@ -50,6 +50,38 @@ def analyze_schema(engine):
 
     return tables, foreign_keys
 
+def extract_schema_entities(tables: dict) -> set[str]:
+    """
+    Extract valid schema entities for grouping / grounding.
+
+    Entities include:
+    - table names
+    - singularized table names
+    - human-readable (non-ID) columns
+    """
+    entities = set()
+
+    for table, meta in tables.items():
+        table_lc = table.lower()
+
+        # table name
+        entities.add(table_lc)
+
+        # naive singularization: albums -> album
+        if table_lc.endswith("s") and len(table_lc) > 1:
+            entities.add(table_lc[:-1])
+
+        # column-based entities
+        for col in meta.get("columns", []):
+            col_lc = col.lower()
+
+            # exclude technical columns
+            if col_lc.endswith("id"):
+                continue
+
+            entities.add(col_lc)
+
+    return entities
 
 def infer_fact_and_dimension_tables(tables, foreign_keys):
     """

@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
-
 from text_to_sql_agent.graph_state import GraphState
+from text_to_sql_agent.grounding.grounding_router import routing_node
 from text_to_sql_agent.graph_nodes import (
     generate_sql_node,
     validate_sql,
@@ -21,6 +21,7 @@ def build_graph(agent):
     # ------------------------------------------------------------
     # Execution nodes ONLY
     # ------------------------------------------------------------
+    graph.add_node("route", routing_node())
     graph.add_node("generate_sql", generate_sql_node(agent))
     graph.add_node("validate_sql", validate_sql)
     graph.add_node("execute_sql", execute_sql)
@@ -29,10 +30,22 @@ def build_graph(agent):
     # ------------------------------------------------------------
     # Entry point
     # ------------------------------------------------------------
-    graph.set_entry_point("generate_sql")
+    graph.set_entry_point("route")
 
     # ------------------------------------------------------------
-    # Main flow
+    # Routing decision (NEW)
+    # ------------------------------------------------------------
+    graph.add_conditional_edges(
+        "route",
+        lambda state: state.execution_mode,
+        {
+            "SQL_REQUIRED": "generate_sql",
+            "NON_SQL_RESPONSE": "final_response",
+        },
+    )
+
+    # ------------------------------------------------------------
+    # Main SQL flow
     # ------------------------------------------------------------
     graph.add_edge("generate_sql", "validate_sql")
 

@@ -39,11 +39,6 @@ class Settings(BaseModel):
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
 
     # ------------------------------------------------------------
-    # RETRY / AGENT POLICY
-    # ------------------------------------------------------------
-    max_retries: int = int(os.getenv("MAX_RETRIES", 3))
-
-    # ------------------------------------------------------------
     # Validation
     # ------------------------------------------------------------
     @field_validator("llm_provider")

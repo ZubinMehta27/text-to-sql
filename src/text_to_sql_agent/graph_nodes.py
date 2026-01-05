@@ -14,6 +14,11 @@ from text_to_sql_agent.sql_tools.sql_tools import (
     sql_exec_tool,
 )
 
+from text_to_sql_agent.grounding.query_enricher import enrich_for_sql
+
+from text_to_sql_agent.errors.error_formatter import format_error_message
+
+
 SYSTEM_PROMPT = load_markdown_content("prompts.md")
 
 # ============================================================
@@ -24,16 +29,38 @@ SYSTEM_PROMPT = load_markdown_content("prompts.md")
 def generate_sql_node(agent):
     """
     Invoke the LLM to generate SQL from schema context + user query.
-    Retry-aware and bounded.
+    Retry-aware, bounded, and deterministically grounded.
     """
+
     def _node(state):
+
+        # ------------------------------------------------------------
+        # HARD GATE: only run if router decided SQL is required
+        # ------------------------------------------------------------
+        if state.execution_mode != "SQL_REQUIRED":
+            return {}
+
+        # ------------------------------------------------------------
+        # Ground the query deterministically
+        # ------------------------------------------------------------
+        grounded_prompt = enrich_for_sql(
+            schema_context=state.schema_context,
+            user_query=state.user_query,
+            schema_entities=state.schema_entities,
+            default_recent_limit=state.default_recent_limit,
+            default_popular_limit=state.default_popular_limit,
+        )
+
         messages = [
-            # 🔒 CRITICAL: strict SQL contract
+            # Strict SQL contract + grounded schema + query
             SystemMessage(
-                content=f"{SYSTEM_PROMPT}\n\n{state.schema_context}"
+                content=f"{SYSTEM_PROMPT}\n\n{grounded_prompt}"
             )
         ]
 
+        # ------------------------------------------------------------
+        # Retry correction path (unchanged, but now grounded)
+        # ------------------------------------------------------------
         if state.validation_error:
             messages.append(
                 SystemMessage(
@@ -45,9 +72,8 @@ def generate_sql_node(agent):
                 )
             )
 
-        messages.append(
-            HumanMessage(content=state.user_query)
-        )
+        # IMPORTANT: no raw user query anymore
+        # messages.append(HumanMessage(content=state.user_query))
 
         response = agent.invoke(messages)
 
@@ -89,14 +115,11 @@ def validate_sql(state):
 
 def execute_sql(state):
     """
-    Execute validated SQL, normalize result, classify output,
-    and attach visualization metadata.
+    Execute validated SQL and return normalized execution result.
+    NO formatting. NO visualization. NO final_answer.
     """
     raw_result = sql_exec_tool(state.sql_query)
 
-    # --------------------------------------------------------
-    # Normalize DB output → JSON-safe (row-level)
-    # --------------------------------------------------------
     normalized = []
 
     if raw_result is not None:
@@ -106,9 +129,13 @@ def execute_sql(state):
             elif hasattr(row, "_mapping"):
                 normalized.append(dict(row._mapping))
             elif isinstance(row, (list, tuple)):
-                normalized.append(list(row))
+                normalized.append(dict(enumerate(row)))
             else:
-                normalized.append(str(row))
+                normalized.append({"value": str(row)})
+
+    return {
+        "execution_result": normalized
+    }
 
     # --------------------------------------------------------
     # Output classification
@@ -148,23 +175,58 @@ def execute_sql(state):
 def final_response_node(state):
     """
     Return final API response.
-    Handles both success and retry exhaustion.
+    Deterministically formats output based on execution result shape.
     """
 
+    # ------------------------------------------------------------
     # Case 1: Successful execution
-    if state.sql_valid and state.final_answer is not None:
+    # ------------------------------------------------------------
+    if state.sql_valid and state.execution_result is not None:
+        output_type = classify_output(state.execution_result)
+
+        # Scalar
+        if output_type == "scalar":
+            value = list(state.execution_result[0].values())[0]
+            return {
+                "final_answer": {
+                    "type": "scalar",
+                    "data": value,
+                }
+            }
+
+        # List
+        if output_type == "list":
+            values = [
+                list(row.values())[0]
+                for row in state.execution_result
+            ]
+            return {
+                "final_answer": {
+                    "type": "list",
+                    "data": values,
+                }
+            }
+
+        # Time series
+        if output_type == "time_series":
+            return {
+                "final_answer": {
+                    "type": "time_series",
+                    "data": state.execution_result,
+                }
+            }
+
+        # Table (default)
         return {
-            "final_answer": state.final_answer
+            "final_answer": {
+                "type": "table",
+                "data": state.execution_result,
+            }
         }
 
-    # Case 2: Retry exhaustion / invalid SQL
+    # ------------------------------------------------------------
+    # Case 2: Failure → formatted, user-facing error (UPDATED)
+    # ------------------------------------------------------------
     return {
-        "final_answer": {
-            "type": "error",
-            "message": (
-                "I couldn't generate a valid SQL query "
-                f"after {state.max_retries} attempts."
-            ),
-            "last_error": state.validation_error,
-        }
+        "final_answer": format_error_message(state.validation_error)
     }

@@ -1,5 +1,7 @@
-from dataclasses import dataclass
-from typing import List, Optional
+from dataclasses import dataclass, field
+from typing import Any, List, Optional, Set
+
+from text_to_sql_agent import config
 
 
 @dataclass
@@ -8,32 +10,23 @@ class GraphState:
     Shared state object passed through LangGraph.
     Defaults are REQUIRED to avoid runtime crashes.
     """
-
-    # ------------------------------------------------------------
-    # Required at entry
-    # ------------------------------------------------------------
     user_query: str
     schema_context: str
 
-    # ------------------------------------------------------------
-    # SQL generation / validation
-    # ------------------------------------------------------------
+    schema_entities: Set[str] = field(default_factory=set)
+
+    execution_mode: Optional[str] = None
+
     sql_query: Optional[str] = None
     sql_valid: bool = False
     validation_error: Optional[str] = None
 
-    # ------------------------------------------------------------
-    # Execution
-    # ------------------------------------------------------------
-    execution_result: Optional[List[dict]] = None
+    execution_result: Optional[List[dict[str, Any]]] = None
 
-    # ------------------------------------------------------------
-    # Retry policy
-    # ------------------------------------------------------------
     retry_count: int = 0
     max_retries: int = 3
 
-    # ------------------------------------------------------------
-    # Final output
-    # ------------------------------------------------------------
+    default_recent_limit: int = 10
+    default_popular_limit: int = 5
+
     final_answer: Optional[dict] = None
