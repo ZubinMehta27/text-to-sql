@@ -1,5 +1,5 @@
 from text_to_sql_agent.graph_state import GraphState
-from text_to_sql_agent import config
+from text_to_sql_agent.runtime_bootstrap import SCHEMA_FINGERPRINT
 
 def build_initial_state(
     user_query: str,
@@ -28,6 +28,14 @@ def build_initial_state(
 
         default_recent_limit=default_recent_limit,
         default_popular_limit=default_popular_limit,
+
+        # --- observability defaults ---
+        last_error_type=None,
+        last_error_message=None,
+        termination_reason=None,
+        retry_reason=None,
+
+        schema_fingerprint=SCHEMA_FINGERPRINT,
 
         final_answer=None,
     )

@@ -29,4 +29,12 @@ class GraphState:
     default_recent_limit: int = 10
     default_popular_limit: int = 5
 
+    # --- Observability ---
+    last_error_type: str | None = None
+    last_error_message: str | None = None
+    termination_reason: str | None = None
+    retry_reason: str | None = None
+
+    schema_fingerprint: str | None = None
+
     final_answer: Optional[dict] = None

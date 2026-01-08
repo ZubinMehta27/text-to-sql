@@ -18,6 +18,7 @@ from text_to_sql_agent.grounding.query_enricher import enrich_for_sql
 
 from text_to_sql_agent.errors.error_formatter import format_error_message
 
+from text_to_sql_agent.runtime_bootstrap import SCHEMA_FINGERPRINT
 
 SYSTEM_PROMPT = load_markdown_content("prompts.md")
 
@@ -34,6 +35,15 @@ def generate_sql_node(agent):
 
     def _node(state):
 
+        # ------------------------------------------------------------
+        # HARD GATE: detect schema drift
+        # ------------------------------------------------------------
+        if state.schema_fingerprint != SCHEMA_FINGERPRINT:
+            state.termination_reason = "schema_drift_detected"
+            state.last_error_type = "terminal"
+            state.last_error_message = "Database schema has changed since startup."
+            return {}
+        
         # ------------------------------------------------------------
         # HARD GATE: only run if router decided SQL is required
         # ------------------------------------------------------------
@@ -118,6 +128,7 @@ def execute_sql(state):
     Execute validated SQL and return normalized execution result.
     NO formatting. NO visualization. NO final_answer.
     """
+
     raw_result = sql_exec_tool(state.sql_query)
 
     normalized = []
@@ -132,6 +143,19 @@ def execute_sql(state):
                 normalized.append(dict(enumerate(row)))
             else:
                 normalized.append({"value": str(row)})
+
+    # --- Post-execution safety limit ---
+    MAX_ROWS = 1000
+
+    if len(normalized) > MAX_ROWS:
+        state.termination_reason = "result_size_exceeded"
+        state.last_error_type = "terminal"
+        state.last_error_message = (
+            f"Query returned more than {MAX_ROWS} rows."
+        )
+        return {
+            "execution_result": None
+        }
 
     return {
         "execution_result": normalized

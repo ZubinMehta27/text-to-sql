@@ -13,6 +13,8 @@ from text_to_sql_agent.agent import agent
 from text_to_sql_agent.graph_build import build_graph
 from text_to_sql_agent.state_initializer import build_initial_state
 
+from text_to_sql_agent.runtime.execution_guard import safe_execute_graph
+
 logging.basicConfig(
     level=settings.log_level,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -43,8 +45,10 @@ def chat(request: ChatRequest):
         schema_entities=schema_entities,
     )
 
-    final_state = graph.invoke(state)
-
+    response = safe_execute_graph(graph, state)
+    
     return {
-        "answer": final_state.get("final_answer")
-    }
+    "answer": response["result"],
+    "metadata": response["metadata"],
+    "request_id": response["request_id"],
+}
