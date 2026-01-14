@@ -19,7 +19,7 @@ def safe_execute_graph(
     start_time = time.time()
 
     try:
-        final_state = graph.invoke(state)
+        final_state = graph.invoke(state) or {}
 
         latency_ms = int((time.time() - start_time) * 1000)
 

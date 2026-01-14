@@ -20,6 +20,8 @@ from text_to_sql_agent.errors.error_formatter import format_error_message
 
 from text_to_sql_agent.runtime_bootstrap import SCHEMA_FINGERPRINT
 
+from text_to_sql_agent.retry.error_classifier import classify_sql_error
+
 SYSTEM_PROMPT = load_markdown_content("prompts.md")
 
 # ============================================================
@@ -91,7 +93,7 @@ def generate_sql_node(agent):
 
         return {
             "sql_query": sql,
-            "retry_count": state.retry_count + 1,
+            "validation_error": state.validation_error,
         }
 
     return RunnableLambda(_node)
@@ -101,10 +103,6 @@ def generate_sql_node(agent):
 # ============================================================
 
 def validate_sql(state):
-    """
-    Deterministically validate generated SQL.
-    Writes validation outcome into state.
-    """
     check = sql_check_tool(state.sql_query)
 
     if check == "VALID":
@@ -113,10 +111,14 @@ def validate_sql(state):
             "validation_error": None,
         }
 
+    # INVALID SQL → this is a retry attempt
     return {
         "sql_valid": False,
         "validation_error": check,
+        "retry_count": state.retry_count + 1,
+        "retry_reason": "retryable_sql_error",
     }
+
 
 
 # ============================================================
@@ -154,7 +156,10 @@ def execute_sql(state):
             f"Query returned more than {MAX_ROWS} rows."
         )
         return {
-            "execution_result": None
+            "execution_result": None,
+            "termination_reason": "result_size_exceeded",
+            "last_error_type": "terminal",
+            "last_error_message": f"Query returned more than {MAX_ROWS} rows.",
         }
 
     return {
@@ -201,6 +206,17 @@ def final_response_node(state):
     Return final API response.
     Deterministically formats output based on execution result shape.
     """
+    # Explicit NON-SQL handling
+    if state.execution_mode == "NON_SQL_RESPONSE":
+        return {
+            "final_answer": {
+                "type": "error",
+                "message": (
+                    "This question cannot be answered using the available database schema. "
+                    "Please rephrase the question using measurable concepts like sales, revenue, or counts."
+                )
+            }
+        }
 
     # ------------------------------------------------------------
     # Case 1: Successful execution
@@ -254,3 +270,11 @@ def final_response_node(state):
     return {
         "final_answer": format_error_message(state.validation_error)
     }
+
+# --- Post-execution tool hook (disabled by default) ---
+# Example:
+# state.invoked_tools.append({
+#     "tool": "summarize_result_table",
+#     "status": "skipped",
+#     "reason": "not enabled"
+# })

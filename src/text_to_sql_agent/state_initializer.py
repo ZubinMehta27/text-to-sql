@@ -37,5 +37,8 @@ def build_initial_state(
 
         schema_fingerprint=SCHEMA_FINGERPRINT,
 
+        # --- Tool metadata ---
+        invoked_tools=[],
+
         final_answer=None,
     )

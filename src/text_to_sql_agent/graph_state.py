@@ -37,4 +37,7 @@ class GraphState:
 
     schema_fingerprint: str | None = None
 
+    # --- Tool metadata ---
+    invoked_tools: list[dict] = field(default_factory=list)
+
     final_answer: Optional[dict] = None
