@@ -1,33 +1,28 @@
-"""
-FUTURE WORK:
-- Tool-based schema reasoning
-- HITL support
-- Query explanation layer
+from langchain.tools import tool
+import json
 
-DO NOT IMPORT OR USE YET.
-"""
 
-from langchain import tools
-from langchain.messages import AIMessage
-from langchain_ollama import ChatOllama
-
-@tools
-def summarize_result_table(result_table: str) -> str:
+@tool
+def summarize_result_table(rows: list[dict]) -> str:
     """
-    Given a result table as a string, summarize its contents in a user-friendly manner.
-
-    Args:
-        result_table: Result table as a string.
-
-    Returns:
-        Summary of the result table as a string.
-    """
-    prompt = f"""
-    Given the following result table:
-
-    {result_table}
-
-    Summarize its contents in a user-friendly manner.
+    Generate a concise, natural-language insight from a SQL result table.
+    Focus on key patterns, extremes, or rankings.
+    Do NOT explain the schema.
+    Do NOT describe columns.
+    Do NOT use placeholders.
+    Be brief and factual.
     """
 
-    pass
+    return (
+        "You are a data analyst explaining query results to a business user.\n\n"
+        "Given the following SQL query result (as JSON rows), write ONE or TWO sentences "
+        "summarizing the most important insight.\n\n"
+        "Rules:\n"
+        "- Do NOT explain what the columns mean\n"
+        "- Do NOT describe rows generically\n"
+        "- Do NOT use placeholders or variables\n"
+        "- Focus on rankings, highest/lowest values, or notable patterns\n"
+        "- Use actual values from the data\n"
+        "- Keep it concise and natural\n\n"
+        f"SQL Result:\n{json.dumps(rows, indent=2)}"
+    )

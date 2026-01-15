@@ -1,10 +1,12 @@
 from text_to_sql_agent.graph_state import GraphState
 from text_to_sql_agent.runtime_bootstrap import SCHEMA_FINGERPRINT
 
+
 def build_initial_state(
     user_query: str,
     schema_context: str,
     schema_entities: set[str],
+    llm,
     max_retries: int = GraphState.max_retries,
     default_recent_limit: int = GraphState.default_recent_limit,
     default_popular_limit: int = GraphState.default_popular_limit,
@@ -19,9 +21,12 @@ def build_initial_state(
         schema_context=schema_context,
         schema_entities=schema_entities,
 
+        execution_mode=None,
+
         sql_query=None,
         sql_valid=False,
         validation_error=None,
+        execution_result=None,
 
         retry_count=0,
         max_retries=max_retries,
@@ -39,6 +44,8 @@ def build_initial_state(
 
         # --- Tool metadata ---
         invoked_tools=[],
+
+        llm=llm,  # PASS THROUGH EXISTING LLM
 
         final_answer=None,
     )

@@ -12,3 +12,4 @@ def extract_tables(sql: str) -> set[str]:
     """
     tree = parse_one(sql, read="sqlite")
     return {t.name.lower() for t in tree.find_all(exp.Table) if t.name}
+

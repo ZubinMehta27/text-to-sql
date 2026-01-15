@@ -12,7 +12,6 @@ from text_to_sql_agent.models.models import ChatRequest
 from text_to_sql_agent.agent import agent
 from text_to_sql_agent.graph_build import build_graph
 from text_to_sql_agent.state_initializer import build_initial_state
-
 from text_to_sql_agent.runtime.execution_guard import safe_execute_graph
 
 logging.basicConfig(
@@ -33,22 +32,32 @@ def chat(request: ChatRequest):
     # ------------------------------------------------------------
     schema_context = build_schema_context(TABLES, FOREIGN_KEYS)
 
-    # 🔹 STEP 2: derive schema entities deterministically
+    # Derive schema entities deterministically
     schema_entities = extract_schema_entities(TABLES)
 
     # ------------------------------------------------------------
-    # Proper state initialization
+    # Proper state initialization (PASS LLM)
     # ------------------------------------------------------------
     state = build_initial_state(
         user_query=request.query,
         schema_context=schema_context,
         schema_entities=schema_entities,
+        llm=agent,
     )
 
     response = safe_execute_graph(graph, state)
-    
-    return {
-    "answer": response["result"],
-    "metadata": response["metadata"],
-    "request_id": response["request_id"],
-}
+
+    api_response = {
+        "answer": response["result"],
+        "metadata": response["metadata"],
+        "request_id": response["request_id"],
+    }
+
+    # --- surface additive fields ---
+    if "post_execution_summary" in response:
+        api_response["post_execution_summary"] = response["post_execution_summary"]
+
+    if "invoked_tools" in response:
+        api_response["invoked_tools"] = response["invoked_tools"]
+
+    return api_response
