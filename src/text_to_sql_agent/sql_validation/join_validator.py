@@ -1,4 +1,5 @@
 from sqlglot import parse_one, exp
+from collections import defaultdict
 
 def extract_joins(sql: str):
     tree = parse_one(sql, read="sqlite")
@@ -29,10 +30,62 @@ def extract_joins(sql: str):
 
     return joins
 
+
+# ============================================================
+# Join Graph Builder
+def build_join_graph(foreign_keys: dict) -> dict[str, set[str]]:
+    """
+    Build an undirected table-level join graph.
+    """
+    graph = defaultdict(set)
+
+    for table, fks in foreign_keys.items():
+        for _, ref_table, _ in fks:
+            graph[table].add(ref_table)
+            graph[ref_table].add(table)
+
+    return graph
+
+
+# ============================================================
+# NEW: Join Path Validator
+def validate_join_paths(sql: str, foreign_keys: dict) -> bool:
+    """
+    Ensure all joined tables form a single connected path
+    in the schema join graph.
+    """
+    joins = extract_joins(sql)
+
+    if not joins:
+        return True  # no joins → OK
+
+    # Collect tables involved in joins
+    tables = set()
+    for lt, _, rt, _ in joins:
+        tables.add(lt)
+        tables.add(rt)
+
+    graph = build_join_graph(foreign_keys)
+
+    # Graph connectivity check (DFS)
+    visited = set()
+    stack = {next(iter(tables))}
+
+    while stack:
+        t = stack.pop()
+        if t in visited:
+            continue
+        visited.add(t)
+        stack |= graph[t] & tables
+
+    return visited == tables
+
+
+# ============================================================
 def validate_joins(sql: str, foreign_keys: dict) -> bool:
     """
     Validate that all joins correspond to real foreign key relationships,
-    regardless of direction.
+    regardless of direction, AND that they form a valid join path.
     """
 
     joins = extract_joins(sql)
@@ -48,12 +101,17 @@ def validate_joins(sql: str, foreign_keys: dict) -> bool:
             fk_pairs.add((table, fk_col, ref_table, ref_col))
             fk_pairs.add((ref_table, ref_col, table, fk_col))  # reverse direction
 
-    # Validate each join
+    # Validate each join uses real FK columns
     for lt, lc, rt, rc in joins:
         if (lt, lc, rt, rc) not in fk_pairs:
             return False
 
+    # Validate join connectivity
+    if not validate_join_paths(sql, foreign_keys):
+        return False
+
     return True
+
 
 def extract_alias_map(tree):
     """
