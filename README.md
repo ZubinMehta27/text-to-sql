@@ -1,4 +1,4 @@
-# Text-to-SQL Agent — Deterministic Core with Tool-Based Reasoning
+# Production-Grade Text-to-SQL Agent with Deterministic Execution and Intelligent Recovery
 
 ## Overview
 
@@ -116,3 +116,4 @@ This short demo shows the system running end-to-end:
 
 ▶️ **Watch the demo:**
 [![Text-to-SQL Demo](publications/thumbnail.png)](https://youtu.be/ymLCIWW8b-o) 
+
