@@ -33,6 +33,7 @@ def extract_joins(sql: str):
 
 # ============================================================
 # Join Graph Builder
+# ============================================================
 def build_join_graph(foreign_keys: dict) -> dict[str, set[str]]:
     """
     Build an undirected table-level join graph.
@@ -48,7 +49,8 @@ def build_join_graph(foreign_keys: dict) -> dict[str, set[str]]:
 
 
 # ============================================================
-# NEW: Join Path Validator
+# Join Path Validator
+# ===========================================================
 def validate_join_paths(sql: str, foreign_keys: dict) -> bool:
     """
     Ensure all joined tables form a single connected path
@@ -81,6 +83,8 @@ def validate_join_paths(sql: str, foreign_keys: dict) -> bool:
     return visited == tables
 
 
+# ============================================================
+# Join Validator
 # ============================================================
 def validate_joins(sql: str, foreign_keys: dict) -> bool:
     """

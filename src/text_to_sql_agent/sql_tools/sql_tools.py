@@ -4,8 +4,6 @@ import sqlalchemy
 
 from text_to_sql_agent.db import engine
 
-from text_to_sql_agent.runtime_bootstrap import FOREIGN_KEYS
-
 from text_to_sql_agent.sql_tools.sql_static_checks import sql_static_check
 
 logger = logging.getLogger(__name__)

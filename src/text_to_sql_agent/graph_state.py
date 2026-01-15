@@ -1,9 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Set
 
-from text_to_sql_agent import config
-
-
 @dataclass
 class GraphState:
     """

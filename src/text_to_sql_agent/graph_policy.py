@@ -1,5 +1,3 @@
-from text_to_sql_agent.retry.error_classifier import classify_sql_error
-
 def retry_decision(state):
     """
     Decide next step after SQL validation.

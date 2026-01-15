@@ -12,9 +12,6 @@ from text_to_sql_agent.sql_tools.sql_tools import (
     sql_exec_tool,
 )
 
-from text_to_sql_agent.sql_tools.sql_tools import HardTermination
-from text_to_sql_agent.sql_tools.sql_parsing import extract_tables
-
 from text_to_sql_agent.grounding.query_enricher import enrich_for_sql
 from text_to_sql_agent.errors.error_formatter import format_error_message
 from text_to_sql_agent.runtime_bootstrap import SCHEMA_FINGERPRINT
